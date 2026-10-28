@@ -1,0 +1,3 @@
+Stack destroyed confirmation:
+aws cloudformation describe-stacks returned:
+An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id Week5EventDrivenStack does not exist
