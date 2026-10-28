@@ -8,13 +8,13 @@ The Week 5 event-driven order system has no admission control. When 1,520 visito
 
 The baseline stampede run shows the problem clearly — 624 throttled requests, a peak of 65 orders/sec slamming into a 40/sec cap:
 
-![Baseline stampede summary — 624 throttled, peak 65/s](../midterm-13.png)
+![Baseline stampede summary — 624 throttled, peak 65/s](images/midterm-13.png)
 
 The baseline dashboard confirms: a spike of 593 4xx errors at the API Gateway level, with Lambda concurrency barely reaching 88 because most requests are rejected before reaching Lambda:
 
-![Baseline dashboard — 593 4xx errors, concurrency spike](../midterm-1.png)
+![Baseline dashboard — 593 4xx errors, concurrency spike](images/midterm-1.png)
 
-![Baseline dashboard — queue depths, message age, DLQ, Lambda duration](../midterm-2.png)
+![Baseline dashboard — queue depths, message age, DLQ, Lambda duration](images/midterm-2.png)
 
 ### Our Solution: A Redis-Based Virtual Waiting Room
 
@@ -74,7 +74,7 @@ The baseline Week 5 architecture is completely unchanged. We added a waiting roo
 
 The successful deployment with the waiting room and all its resources:
 
-![CDK deploy output — 541s total, all resources created](../midterm-3.png)
+![CDK deploy output — 541s total, all resources created](images/midterm-3.png)
 
 ### AWS Resources Created
 
@@ -254,7 +254,7 @@ These use CloudWatch Embedded Metric Format (EMF): each call prints a JSON line 
 
 Our three custom dashboard widgets show the Redis-specific health metrics that matter for Option C:
 
-![Custom widgets — Redis connections/commands, Redis CPU, Admissions table writes](../midterm-12.png)
+![Custom widgets — Redis connections/commands, Redis CPU, Admissions table writes](images/midterm-12.png)
 
 1. **Redis - connections & commands/s** — shows CurrConnections (peaking at ~102 as Lambda scales out) and SetTypeCmds/GetTypeCmds (peaking at ~19K commands/min). The connection count mirrors Lambda's scaling behavior — more concurrent invocations means more active Redis connections.
 
@@ -266,7 +266,7 @@ Our three custom dashboard widgets show the Redis-specific health metrics that m
 
 The one-page Midterm dashboard captured the entire stampede. Row 1 shows the front door and Lambda scaling:
 
-![Dashboard Row 1 — API Gateway errors (spike at baseline, flat during WR run), Lambda concurrency, Lambda invocations](../midterm-8.png)
+![Dashboard Row 1 — API Gateway errors (spike at baseline, flat during WR run), Lambda concurrency, Lambda invocations](images/midterm-8.png)
 
 The 4xx spike at ~20:25 is from the baseline run (624 throttled requests). During the waiting room run (~20:39-20:42), the 4xx count is near zero — only the 78 bot rejections (403s), which are correct behavior.
 
@@ -274,19 +274,19 @@ Lambda concurrent executions show the producer peaking at ~90 during the stamped
 
 Row 2 shows the queues and consumer health behind the fan-out:
 
-![Dashboard Row 2 — Queue depths, Oldest message age, DLQ depths, Lambda errors/throttles, Lambda duration, Time in line](../midterm-9.png)
+![Dashboard Row 2 — Queue depths, Oldest message age, DLQ depths, Lambda errors/throttles, Lambda duration, Time in line](images/midterm-9.png)
 
 Queue depths stay at zero — messages are consumed as fast as they arrive because the waiting room throttles the inflow to ~10/sec, well within each consumer's capacity. The "Oldest message age" shows brief spikes in the analytics queue (up to ~29 seconds) as the analytics consumer batches messages, but nothing concerning. DLQ depths are zero — no messages failed processing. Lambda errors and throttles are zero across all functions.
 
 The time-in-line panel shows the admission pacing clearly:
 
-![Dashboard Row 3 (zoomed) — Lambda errors/throttles (zero), Lambda duration p99, Time in line median and p95](../midterm-10.png)
+![Dashboard Row 3 (zoomed) — Lambda errors/throttles (zero), Lambda duration p99, Time in line median and p95](images/midterm-10.png)
 
 The median time in line climbs steadily from ~2 seconds to ~2.1 minutes as later visitors wait for their turn. The p95 tracks slightly above the median. This linear climb is exactly what a constant-rate admission produces — each new visitor waits proportionally longer because they're further back in line.
 
 Row 4 shows the waiting room's own metrics — the heart of the system:
 
-![Dashboard Row 4 — Visitors joined/admitted per minute, People waiting now, API Gateway request count](../midterm-11.png)
+![Dashboard Row 4 — Visitors joined/admitted per minute, People waiting now, API Gateway request count](images/midterm-11.png)
 
 The "Visitors joined and admitted" panel shows the stampede clearly: ~1,440 visitors join in one burst (the blue spike), then admissions (orange) flow steadily at a controlled rate. The "People waiting now" panel shows the queue building to ~1,100 during the burst, then draining steadily as admissions catch up. The API Gateway request count peaks at ~11.5K requests/min during the stampede — this is dominated by status polling traffic, which is cheap and never touches the backend.
 
@@ -296,7 +296,7 @@ The "Visitors joined and admitted" panel shows the stampede clearly: ~1,440 visi
 
 ### Comparison Table
 
-![Side-by-side comparison — baseline vs waiting room](../midterm-6.png)
+![Side-by-side comparison — baseline vs waiting room](images/midterm-6.png)
 
 | Metric | Baseline (no waiting room) | With Waiting Room | Change |
 |---|---|---|---|
@@ -313,11 +313,11 @@ The "Visitors joined and admitted" panel shows the stampede clearly: ~1,440 visi
 
 ### Scorecard: Every Rule Passed
 
-![check_run.py scorecard — all 10 rules PASS](../midterm-4.png)
+![check_run.py scorecard — all 10 rules PASS](images/midterm-4.png)
 
 ### Stampede Summary: Steady ~10 Orders/Second
 
-![summarize_stampede.py — steady 9.0-10.5 orders/s across all windows](../midterm-5.png)
+![summarize_stampede.py — steady 9.0-10.5 orders/s across all windows](images/midterm-5.png)
 
 ### Rate Analysis
 
@@ -345,7 +345,7 @@ The total status polls across all visitors: **16,529**. This is the waiting room
 
 Without the waiting room, all 1,520 visitors hit `POST /orders` directly within 25 seconds. The 40/sec cap instantly rejected the excess:
 
-![Baseline summary — 624 throttled, peak 65/s, no fairness](../midterm-13.png)
+![Baseline summary — 624 throttled, peak 65/s, no fairness](images/midterm-13.png)
 
 624 fans got 429 errors — permanently lost. No retry, no fairness. The peak of 65 orders/sec means the backend saw almost 2x its cap in a single window. With the waiting room, the peak dropped to 19.3/sec (during ramp-up) and settled to ~10/sec.
 
@@ -394,7 +394,7 @@ The tradeoff is an extra Lambda function, an EventBridge rule, and the fact that
 
 All provided files remained intact throughout development:
 
-![verify_kit.py — PASS, 25 provided files intact](../midterm-7.png)
+![verify_kit.py — PASS, 25 provided files intact](images/midterm-7.png)
 
 | Check | Result |
 |---|---|
